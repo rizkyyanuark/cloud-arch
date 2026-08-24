@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # 1. GitLab Community Edition (CE) - Core DevOps & GitOps Hub
+  # ============================================================================
+  gitlab:
+    image: 'gitlab/gitlab-ce:17.9.8-ce.0'
+    restart: always
+    hostname: 'gitlab.${BASE_DOMAIN:-tugasakhir.space}'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://gitlab.${BASE_DOMAIN:-tugasakhir.space}'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          "Host" => "$$http_host",
+          "X-Real-IP" => "$$remote_addr",
+          "X-Forwarded-For" => "$$proxy_add_x_forwarded_for",
+          "X-Forwarded-Proto" => "https",
+          "X-Forwarded-Ssl" => "on"
+        }
+        puma['worker_processes'] = 2
+        puma['min_threads'] = 1
+        puma['max_threads'] = 4
+        sidekiq['max_concurrency'] = 10
+        prometheus_monitoring['enable'] = false
+        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-InitRootPassMiniProject2026!}'
+    ports:
+      - '8080:80'
+      - '2222:22'
+    volumes:
+      - '/srv/gitlab/config:/etc/gitlab'
+      - '/srv/gitlab/logs:/var/log/gitlab'
+      - '/srv/gitlab/data:/var/opt/gitlab'
+    networks:
+      - cloud-arch-net
+
+  # ============================================================================
+  # 2. Custom JupyterLab RTC - Real-Time Collaborative Research Workspace
+  # ============================================================================
+  jupyter:
+    build:
+      context: ./jupyter
+      dockerfile: Dockerfile
+    image: 'cloud-arch-jupyter:latest'
+    restart: always
+    environment:
+      JUPYTER_ENABLE_LAB: 'yes'
+      JUPYTER_TOKEN: '${JUPYTER_TOKEN:-miniproject2026}'
+      BASE_DOMAIN: '${BASE_DOMAIN:-tugasakhir.space}'
+    ports:
+      - '8888:8888'
+    volumes:
+      - '/home/ubuntu/workspace:/home/jovyan/work'
+      - '/home/ubuntu/jupyter-user-data/.jupyter:/home/jovyan/.jupyter'
+      - '/home/ubuntu/jupyter-user-data/.local:/home/jovyan/.local'
+    networks:
+      - cloud-arch-net
+
+  # ============================================================================
+  # 3. MLflow Tracking Server - Centralized MLOps & Model Lineage Hub
+  # ============================================================================
+  mlflow:
+    build:
+      context: ./mlflow
+      dockerfile: Dockerfile
+    image: 'cloud-arch-mlflow:latest'
+    restart: always
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: '${R2_ENDPOINT_URL:-https://11d2d9aa25f8977089f6f9430db62d02.r2.cloudflarestorage.com}'
+      AWS_ACCESS_KEY_ID: '${AWS_ACCESS_KEY_ID}'
+      AWS_SECRET_ACCESS_KEY: '${AWS_SECRET_ACCESS_KEY}'
+      R2_BUCKET_NAME: '${R2_BUCKET_NAME:-mini-project-lake}'
+    ports:
+      - '5000:5000'
+    volumes:
+      - '/srv/mlflow/data:/mlflow/data'
+    networks:
+      - cloud-arch-net
+
+networks:
+  cloud-arch-net:
+    driver: bridge

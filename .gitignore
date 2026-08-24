@@ -1,0 +1,19 @@
+# Environment & Secrets
+.env
+*.pem
+*.key
+*.crt
+
+# Runtime Data & Storage
+data/
+jupyter-user-data/
+gitlab-data/
+mlflow-data/
+*.db
+*.sqlite
+
+# Python & System
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
