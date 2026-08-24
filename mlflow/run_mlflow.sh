@@ -14,5 +14,7 @@ echo "================================================================="
 exec mlflow server \
     --backend-store-uri "$BACKEND_STORE" \
     --default-artifact-root "$ARTIFACT_ROOT" \
+    --allowed-hosts "*" \
+    --cors-allowed-origins "*" \
     --host 0.0.0.0 \
     --port 5000

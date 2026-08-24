@@ -76,6 +76,7 @@ services:
       - '5000:5000'
     volumes:
       - '/srv/mlflow/data:/mlflow/data'
+      - './mlflow/run_mlflow.sh:/mlflow/run_mlflow.sh'
     networks:
       - cloud-arch-net
 
