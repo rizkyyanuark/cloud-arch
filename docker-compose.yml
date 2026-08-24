@@ -5,7 +5,7 @@ services:
   # 1. GitLab Community Edition (CE) - Core DevOps & GitOps Hub
   # ============================================================================
   gitlab:
-    image: 'gitlab/gitlab-ce:17.9.8-ce.0'
+    image: 'gitlab/gitlab-ce:latest'
     restart: always
     hostname: 'gitlab.${BASE_DOMAIN:-tugasakhir.space}'
     environment:
