@@ -2,10 +2,11 @@ version: '3.8'
 
 services:
   # ============================================================================
-  # 1. GitLab Community Edition (CE) - Core DevOps & GitOps Hub
+  # 1. GitLab Community Edition (CE) - Production Hardened Low-Memory Edition
   # ============================================================================
   gitlab:
     image: 'gitlab/gitlab-ce:latest'
+    container_name: gitlab-ce
     restart: always
     hostname: 'gitlab.${BASE_DOMAIN:-tugasakhir.space}'
     environment:
@@ -20,15 +21,45 @@ services:
           "X-Forwarded-Proto" => "https",
           "X-Forwarded-Ssl" => "on"
         }
-        puma['worker_processes'] = 2
+
+        # Low-Memory Profile (Fits inside 2GB-4GB RAM without crashing)
+        puma['worker_processes'] = 0
         puma['min_threads'] = 1
-        puma['max_threads'] = 4
-        sidekiq['max_concurrency'] = 10
+        puma['max_threads'] = 2
+        puma['worker_timeout'] = 120
+        sidekiq['concurrency'] = 1
+        sidekiq['max_concurrency'] = 2
+        postgresql['shared_buffers'] = "64MB"
+        postgresql['max_worker_processes'] = 1
+        gitaly['ruby_max_rss'] = 150000000
+        gitaly['env'] = { 'GITALY_COMMAND_SPAWN_MAX_PARALLEL' => '2' }
+        gitlab_kas['enable'] = false
         prometheus_monitoring['enable'] = false
+        gitlab_pages['enable'] = false
+        registry['enable'] = false
+        gitlab_exporter['enable'] = false
+        gitlab_rails['env'] = {
+          'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000'
+        }
+
+        # Transactional Email Gateway (Resend SMTP over Port 465 SSL/TLS)
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "${SMTP_ADDRESS:-smtp.resend.com}"
+        gitlab_rails['smtp_port'] = ${SMTP_PORT:-465}
+        gitlab_rails['smtp_user_name'] = "${SMTP_USER:-resend}"
+        gitlab_rails['smtp_password'] = "${SMTP_PASSWORD}"
+        gitlab_rails['smtp_domain'] = "${BASE_DOMAIN:-tugasakhir.space}"
+        gitlab_rails['smtp_authentication'] = "login"
+        gitlab_rails['smtp_tls'] = true
+        gitlab_rails['smtp_enable_starttls_auto'] = false
+        gitlab_rails['gitlab_email_from'] = '${SMTP_FROM_EMAIL:-no-reply@tugasakhir.space}'
+        gitlab_rails['gitlab_email_display_name'] = '${SMTP_DISPLAY_NAME:-Admin Tugas Akhir}'
+        gitlab_rails['gitlab_email_reply_to'] = 'noreply@${BASE_DOMAIN:-tugasakhir.space}'
+
         gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-InitRootPassMiniProject2026!}'
     ports:
-      - '8080:80'
-      - '2222:22'
+      - '127.0.0.1:${GITLAB_PORT:-8080}:80'
+      - '${GITLAB_SSH_PORT:-2222}:22'
     volumes:
       - '/srv/gitlab/config:/etc/gitlab'
       - '/srv/gitlab/logs:/var/log/gitlab'
@@ -37,43 +68,68 @@ services:
       - cloud-arch-net
 
   # ============================================================================
-  # 2. Custom JupyterLab RTC - Real-Time Collaborative Research Workspace
+  # 2. JupyterLab RTC - Real-Time Collaborative Research Workspace
   # ============================================================================
   jupyter:
     build:
       context: ./jupyter
       dockerfile: Dockerfile
     image: 'cloud-arch-jupyter:latest'
+    container_name: jupyterlab
     restart: always
     environment:
-      JUPYTER_ENABLE_LAB: 'yes'
-      JUPYTER_TOKEN: '${JUPYTER_TOKEN:-miniproject2026}'
-      BASE_DOMAIN: '${BASE_DOMAIN:-tugasakhir.space}'
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-miniproject2026}
+      - BASE_DOMAIN=${BASE_DOMAIN:-tugasakhir.space}
+      - UV_CACHE_DIR=/home/jovyan/work/.cache/uv
+      - GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+    extra_hosts:
+      - "gitlab.${BASE_DOMAIN:-tugasakhir.space}:172.18.0.1"
+      - "lab.${BASE_DOMAIN:-tugasakhir.space}:172.18.0.1"
+      - "mlflow.${BASE_DOMAIN:-tugasakhir.space}:172.18.0.1"
     ports:
-      - '8888:8888'
+      - '127.0.0.1:${JUPYTER_PORT:-8888}:8888'
     volumes:
       - '/home/ubuntu/workspace:/home/jovyan/work'
       - '/home/ubuntu/jupyter-user-data/.jupyter:/home/jovyan/.jupyter'
       - '/home/ubuntu/jupyter-user-data/.local:/home/jovyan/.local'
+      - '/usr/local/bin/agy:/usr/local/bin/agy:ro'
+      - '/home/ubuntu/.gemini:/home/jovyan/.gemini'
+      - '/home/ubuntu/.ssh:/home/jovyan/.ssh:ro'
+    user: root
+    working_dir: /home/jovyan/work
+    command: >
+      bash -c "umask 0002 &&
+               mkdir -p /home/jovyan/work/.cache/uv &&
+               mkdir -p /home/jovyan/.local/bin &&
+               ln -sf /opt/conda/bin/uv /home/jovyan/.local/bin/uv &&
+               mkdir -p /home/jovyan/.npm &&
+               mkdir -p /tmp/dynamic_kernels &&
+               git config --global --add safe.directory '*' || true &&
+               git config --global credential.helper 'store --file=/home/jovyan/.jupyter/.git-credentials' || true &&
+               git config --global credential.useHttpPath true || true &&
+               chown -R jovyan:users /tmp/dynamic_kernels /home/jovyan/.jupyter /home/jovyan/.local /home/jovyan/.npm 2>/dev/null || true &&
+               start-notebook.py --ServerApp.ip=0.0.0.0 --config=/etc/jupyter/jupyter_server_config.py"
     networks:
       - cloud-arch-net
 
   # ============================================================================
-  # 3. MLflow Tracking Server - Centralized MLOps & Model Lineage Hub
+  # 3. MLflow Tracking Server - Centralized MLOps Hub with Cloudflare R2
   # ============================================================================
   mlflow:
     build:
       context: ./mlflow
       dockerfile: Dockerfile
     image: 'cloud-arch-mlflow:latest'
+    container_name: mlflow-server
     restart: always
     environment:
-      MLFLOW_S3_ENDPOINT_URL: '${R2_ENDPOINT_URL:-https://11d2d9aa25f8977089f6f9430db62d02.r2.cloudflarestorage.com}'
-      AWS_ACCESS_KEY_ID: '${AWS_ACCESS_KEY_ID}'
-      AWS_SECRET_ACCESS_KEY: '${AWS_SECRET_ACCESS_KEY}'
-      R2_BUCKET_NAME: '${R2_BUCKET_NAME:-mini-project-lake}'
+      - MLFLOW_S3_ENDPOINT_URL=${R2_ENDPOINT_URL:-https://11d2d9aa25f8977089f6f9430db62d02.r2.cloudflarestorage.com}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-mini-project-lake}
     ports:
-      - '5000:5000'
+      - '127.0.0.1:${MLFLOW_PORT:-5000}:5000'
     volumes:
       - '/srv/mlflow/data:/mlflow/data'
       - './mlflow/run_mlflow.sh:/mlflow/run_mlflow.sh'

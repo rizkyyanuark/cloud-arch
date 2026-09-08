@@ -1,0 +1,36 @@
+﻿feat(infra): harmonize full stack IaC with production EC2 environment
+
+Align repository configuration with the live AWS EC2 server (t4g.small ARM64)
+to ensure reproducible single-command provisioning from a fresh instance.
+
+Detailed component changelog:
+
+1. docker-compose.yml:
+   - Configure GitLab CE for memory-constrained instances using single-process
+     Puma (worker_processes = 0, max_threads = 2) and 64MB PostgreSQL buffers.
+   - Add Resend SMTP transactional email configuration over port 465 SSL/TLS.
+   - Bind container application ports (8080, 8888, 5000) to 127.0.0.1 for
+     network isolation behind Nginx reverse proxy.
+   - Add extra_hosts mapping for internal container-to-host DNS resolution.
+   - Mount host Antigravity CLI binary, Gemini configs, and SSH read-only keys into JupyterLab.
+   - Connect MLflow tracking server to Cloudflare R2 object storage ($0 egress).
+
+2. Nginx & Networking (nginx/conf.d/cloud-arch.conf):
+   - Disable proxy buffering and caching on JupyterLab routes to eliminate terminal typing latency.
+   - Add reverse proxy location for Google OAuth 2.0 web callback on port 8085.
+
+3. JupyterLab Environment (jupyter/Dockerfile):
+   - Disable Conda base auto-activation to allow instantaneous terminal startup.
+
+4. Provisioning Automation (deploy.sh):
+   - Automate 6.0 GB NVMe swap allocation with sysctl vm.swappiness=10.
+   - Automate installation, directory permissions, and systemd service registration.
+
+5. Host Services (telegram/):
+   - Add telegram_antigravity_bridge.py gateway script with environment variable loaders.
+   - Add antigravity-telegram.service systemd unit file.
+
+6. Documentation & Environment:
+   - Expand .env.example with complete credentials reference.
+   - Rewrite README.md and ARCHITECTURE.md to follow technical anti-slop guidelines:
+     zero em dashes, zero filler buzzwords, and verifiable architectural decisions.

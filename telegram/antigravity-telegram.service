@@ -1,0 +1,18 @@
+[Unit]
+Description=Antigravity Telegram Gateway Bridge Service
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/antigravity-telegram
+ExecStart=/usr/bin/python3 /home/ubuntu/antigravity-telegram/telegram_antigravity_bridge.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

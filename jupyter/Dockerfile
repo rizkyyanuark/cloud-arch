@@ -16,6 +16,9 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/
 
 USER ${NB_UID}
 
+# Optimize terminal startup: disable slow Conda base auto-activation
+RUN conda config --set auto_activate_base false
+
 # Install pure IDE extensions, visual Git, diff tools, formatting, and GPU gateway
 RUN pip install --no-cache-dir \
     "jupyter-collaboration>=3.0.0" \
