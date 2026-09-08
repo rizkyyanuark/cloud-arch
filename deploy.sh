@@ -110,6 +110,7 @@ fi
 
 # 8. Build and Launch Containers
 echo "Membangun dan menyalakan container stack..."
+chmod +x mlflow/run_mlflow.sh 2>/dev/null || true
 docker compose build
 docker compose up -d
 
