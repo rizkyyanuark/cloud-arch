@@ -11,11 +11,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Load Environment Variables (.env)
-if [ -f "${ROOT_DIR}/.env" ]; then
-    # shellcheck disable=SC1091
-    source "${ROOT_DIR}/.env"
-fi
+# Load Environment Variables (.env) with Auto-Discovery
+for env_file in "${ROOT_DIR}/.env" "/home/ubuntu/infra-hub/.env" "/home/ubuntu/cloud-arch/.env" "/etc/cloud-arch/.env"; do
+    if [ -f "${env_file}" ]; then
+        # shellcheck disable=SC1090
+        source "${env_file}"
+        export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
+        export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+        break
+    fi
+done
 
 R2_BUCKET="${R2_BUCKET_NAME:-mini-project-lake}"
 R2_ENDPOINT="${R2_ENDPOINT_URL:-https://11d2d9aa25f8977089f6f9430db62d02.r2.cloudflarestorage.com}"
