@@ -64,6 +64,13 @@ mkdir -p /srv/gitlab/config /srv/gitlab/logs /srv/gitlab/data
 mkdir -p /srv/mlflow/data
 mkdir -p /home/ubuntu/workspace /home/ubuntu/jupyter-user-data/.jupyter /home/ubuntu/jupyter-user-data/.local
 mkdir -p /home/ubuntu/.gemini /home/ubuntu/.config/antigravity /home/ubuntu/antigravity-telegram
+if [ ! -f /usr/local/bin/agy ] && [ ! -d /usr/local/bin/agy ]; then
+  cat << 'EOF' > /usr/local/bin/agy
+#!/usr/bin/env bash
+echo "Antigravity CLI wrapper. Install the latest binary or npm package if needed."
+EOF
+  chmod +x /usr/local/bin/agy
+fi
 chown -R 1000:100 /home/ubuntu/workspace /home/ubuntu/jupyter-user-data
 chown -R ubuntu:ubuntu /home/ubuntu/.gemini /home/ubuntu/.config /home/ubuntu/antigravity-telegram 2>/dev/null || true
 
