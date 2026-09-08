@@ -94,8 +94,6 @@ services:
       - '/home/ubuntu/jupyter-user-data/.jupyter:/home/jovyan/.jupyter'
       - '/home/ubuntu/jupyter-user-data/.local:/home/jovyan/.local'
       - '/usr/local/bin/agy:/usr/local/bin/agy:ro'
-      - '/home/ubuntu/.gemini:/home/jovyan/.gemini'
-      - '/home/ubuntu/.ssh:/home/jovyan/.ssh:ro'
     user: root
     working_dir: /home/jovyan/work
     command: >

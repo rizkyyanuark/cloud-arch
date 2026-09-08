@@ -86,9 +86,9 @@ sed "s/example.com/$DOMAIN/g" nginx/conf.d/cloud-arch.conf > /etc/nginx/sites-av
 ln -sf /etc/nginx/sites-available/cloud-arch.conf /etc/nginx/sites-enabled/cloud-arch.conf
 nginx -t && systemctl reload nginx
 
-# 7. Setup Systemd Service for Telegram Antigravity Bridge
-if [ -f telegram/telegram_antigravity_bridge.py ]; then
-  echo "Memasang Telegram Antigravity Gateway Bridge..."
+# 7. Setup Systemd Service for Telegram Antigravity Bridge (Opt-In)
+if [ -f telegram/telegram_antigravity_bridge.py ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ "${TELEGRAM_BOT_TOKEN}" != "your_telegram_bot_token_here" ]; then
+  echo "Memasang Telegram Antigravity Gateway Bridge (Token terdeteksi)..."
   cp telegram/telegram_antigravity_bridge.py /home/ubuntu/antigravity-telegram/
   chown -R ubuntu:ubuntu /home/ubuntu/antigravity-telegram
   chmod +x /home/ubuntu/antigravity-telegram/telegram_antigravity_bridge.py
@@ -104,11 +104,32 @@ if [ -f telegram/telegram_antigravity_bridge.py ]; then
     systemctl daemon-reload
     systemctl enable antigravity-telegram.service
     systemctl restart antigravity-telegram.service || true
-    echo "Service antigravity-telegram berhasil dipasang."
+    echo "Service antigravity-telegram berhasil dipasang dan diaktifkan."
+  fi
+else
+  echo "Telegram Bridge dilewati (opt-in: konfigurasi TELEGRAM_BOT_TOKEN di .env untuk mengaktifkan)."
+fi
+
+# 8. Setup GPU Switch Helper and Automated Backup Engine
+echo "Memasang skrip utilitas sistem (GPU Orchestrator & Backup Engine)..."
+if [ -f scripts/gpu.py ]; then
+  cp scripts/gpu.py /usr/local/bin/gpu
+  chmod +x /usr/local/bin/gpu
+  echo "✓ Perintah 'gpu' terpasang di /usr/local/bin/gpu"
+fi
+
+if [ -f scripts/backup.sh ]; then
+  chmod +x scripts/backup.sh scripts/restore.sh scripts/check_health.sh 2>/dev/null || true
+  mkdir -p /opt/cloud-arch/scripts
+  cp scripts/backup.sh /opt/cloud-arch/scripts/backup.sh
+  chmod +x /opt/cloud-arch/scripts/backup.sh
+  if ! crontab -l 2>/dev/null | grep -q "/opt/cloud-arch/scripts/backup.sh"; then
+    (crontab -l 2>/dev/null; echo "0 2 * * * /opt/cloud-arch/scripts/backup.sh > /var/log/cloud-arch-backup.log 2>&1") | crontab -
+    echo "✓ Jadwal pencadangan otomatis (Cron) terpasang di 02:00 AM."
   fi
 fi
 
-# 8. Build and Launch Containers
+# 9. Build and Launch Containers
 echo "Membangun dan menyalakan container stack..."
 chmod +x mlflow/run_mlflow.sh 2>/dev/null || true
 docker compose build
@@ -121,3 +142,9 @@ echo "JupyterLab RTC  : https://lab.$DOMAIN (Port 8888)"
 echo "Google OAuth Web: https://lab.$DOMAIN/oauth2callback (Port 8085)"
 echo "MLflow Tracking : https://mlflow.$DOMAIN (Port 5000)"
 echo "================================================================="
+
+# 10. Run End-to-End Health Probe
+if [ -f scripts/check_health.sh ]; then
+  echo "Menjalankan audit kesiapan sistem..."
+  bash scripts/check_health.sh || true
+fi
