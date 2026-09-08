@@ -96,7 +96,7 @@ if [ -f telegram/telegram_antigravity_bridge.py ]; then
   # Install python dependencies for telegram bridge if python3 is present
   if command -v python3 &> /dev/null; then
     apt-get install -y python3-pip python3-venv || true
-    pip3 install --break-system-packages aiohttp psutil requests telegramify_markdown 2>/dev/null || pip3 install aiohttp psutil requests telegramify_markdown 2>/dev/null || true
+    pip3 install --break-system-packages --progress-bar off aiohttp psutil requests telegramify_markdown 2>/dev/null || pip3 install --progress-bar off aiohttp psutil requests telegramify_markdown 2>/dev/null || true
   fi
 
   if [ -f telegram/antigravity-telegram.service ]; then
